@@ -102,13 +102,10 @@ def pep(session):
     if response is None:
         return
     soup = BeautifulSoup(response.text, features='lxml')
-    index_section = find_tag(
-        soup,
-        'section',
-        attrs={'id': 'numerical-index'},
-    )
+    index_section = find_tag(soup, 'section', attrs={'id': 'numerical-index'})
     tbody_tag = find_tag(index_section, 'tbody')
     key_status_urls = []
+    non_matching_statuses = []
     pep_refs = tbody_tag.find_all('td', string=re.compile(r'^\d+$'))
     for pep_ref in tqdm(pep_refs):
         key = find_siblings(pep_ref, 'prev').text[1:]
@@ -123,30 +120,32 @@ def pep(session):
             if 'Status' in dt_tag.text:
                 status = find_siblings(dt_tag).text
                 key_status_urls.append((key, status, pep_url))
+                if key not in EXPECTED_STATUS.keys():
+                    non_matching_statuses.append(
+                        f'Неизвестный ключ: {key}\n'
+                        f'{pep_url}'
+                    )
+                    continue
+                if status not in EXPECTED_STATUS[key]:
+                    non_matching_statuses.append(
+                        'Не совпадают статусы:\n'
+                        f'{pep_url}\n'
+                        f'Статус в карточке: {status}\n'
+                        f'Ожидаемые статусы: {EXPECTED_STATUS[key]}'
+                    )
                 break
     statuses = [key_status_url[1] for key_status_url in key_status_urls]
     status_counts = {status: statuses.count(status) for status in statuses}
     peps_per_status = list(status_counts.items())
     peps_per_status.sort(key=lambda status: status[0])
     total = sum(status_counts.values())
-
     header, footer = [('Status', 'Amount')], [('Total', total)]
     results = header + peps_per_status + footer
 
-    for key, status, url in key_status_urls:
-        if key not in EXPECTED_STATUS.keys():
-            logging.info(
-                f'Неизвестный ключ: {key}\n'
-                f'{url}'
-            )
-            continue
-        if status not in EXPECTED_STATUS[key]:
-            logging.info(
-                f'Не совпадают статусы:\n'
-                f'{url}\n'
-                f'Статус в карточке: {status}\n'
-                f'Ожидаемые статусы: {EXPECTED_STATUS[key]}'
-            )
+    if non_matching_statuses:
+        for non_matching_status in non_matching_statuses:
+            tqdm.write(non_matching_status)
+
     return results
 
 
