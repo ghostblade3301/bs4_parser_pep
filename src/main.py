@@ -1,15 +1,15 @@
 import logging
 import re
-from urllib.parse import urljoin
-
 import requests_cache
+
 from bs4 import BeautifulSoup
 from tqdm import tqdm
+from urllib.parse import urljoin
 
 from configs import configure_argument_parser, configure_logging
-from constants import BASE_DIR, MAIN_DOC_URL
+from constants import BASE_DIR, EXPECTED_STATUS, MAIN_DOC_URL, PEP_INDEX_URL
 from outputs import control_output
-from utils import find_tag, get_response
+from utils import find_siblings, find_tag, get_response
 
 
 def whats_new(session):
@@ -25,7 +25,7 @@ def whats_new(session):
         'li',
         attrs={'class': 'toctree-l1'}
     )
-    results = [('Ссылка на статью', 'Заголовок', 'Редактор, автор')]
+    results = [('Ссылка на статью', 'Заголовок', 'Редактор, Автор')]
     for section in tqdm(sections_by_python):
         version_a_tag = find_tag(section, 'a')
         href = version_a_tag['href']
@@ -98,7 +98,56 @@ def download(session):
 
 
 def pep(session):
-    pass
+    response = get_response(session, PEP_INDEX_URL)
+    if response is None:
+        return
+    soup = BeautifulSoup(response.text, features='lxml')
+    index_section = find_tag(
+        soup,
+        'section',
+        attrs={'id': 'numerical-index'},
+    )
+    tbody_tag = find_tag(index_section, 'tbody')
+    key_status_urls = []
+    pep_refs = tbody_tag.find_all('td', string=re.compile(r'^\d+$'))
+    for pep_ref in tqdm(pep_refs):
+        key = find_siblings(pep_ref, 'prev').text[1:]
+        pep_url = urljoin(PEP_INDEX_URL, pep_ref.a['href'])
+        response = get_response(session, pep_url)
+        if response is None:
+            continue
+        soup = BeautifulSoup(response.text, features='lxml')
+        dl_tag = find_tag(soup, 'dl', {'class': 'rfc2822 field-list simple'})
+        dt_tags = dl_tag.find_all('dt')
+        for dt_tag in dt_tags:
+            if 'Status' in dt_tag.text:
+                status = find_siblings(dt_tag).text
+                key_status_urls.append((key, status, pep_url))
+                break
+    statuses = [key_status_url[1] for key_status_url in key_status_urls]
+    status_counts = {status: statuses.count(status) for status in statuses}
+    peps_per_status = list(status_counts.items())
+    peps_per_status.sort(key=lambda status: status[0])
+    total = sum(status_counts.values())
+
+    header, footer = [('Status', 'Amount')], [('Total', total)]
+    results = header + peps_per_status + footer
+
+    for key, status, url in key_status_urls:
+        if key not in EXPECTED_STATUS.keys():
+            logging.info(
+                f'Неизвестный ключ: {key}\n'
+                f'{url}'
+            )
+            continue
+        if status not in EXPECTED_STATUS[key]:
+            logging.info(
+                f'Не совпадают статусы:\n'
+                f'{url}\n'
+                f'Статус в карточке: {status}\n'
+                f'Ожидаемые статусы: {EXPECTED_STATUS[key]}'
+            )
+    return results
 
 
 MODE_TO_FUNCTION = {

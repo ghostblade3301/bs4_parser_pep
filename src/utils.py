@@ -24,3 +24,13 @@ def find_tag(soup, tag, attrs=None):
         logging.error(error_msg, stack_info=True)
         raise ParserFindTagException(error_msg)
     return searched_tag
+
+
+def find_siblings(soup, search='next'):
+    searched_tag = (soup.find_next_sibling() if search == 'next'
+                    else soup.find_previous_sibling())
+    if searched_tag is None:
+        error_message = 'Сиблинг тэг не найден'
+        logging.error(error_message, stack_info=True)
+        raise ParserFindTagException(error_message)
+    return searched_tag
