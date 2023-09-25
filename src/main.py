@@ -8,6 +8,7 @@ from urllib.parse import urljoin
 
 from configs import configure_argument_parser, configure_logging
 from constants import BASE_DIR, EXPECTED_STATUS, MAIN_DOC_URL, PEP_INDEX_URL
+from exceptions import ParserFindUrlException
 from outputs import control_output
 from utils import find_siblings, find_tag, get_response
 
@@ -58,7 +59,7 @@ def latest_versions(session):
             a_tags = ul.find_all('a')
             break
     else:
-        raise Exception('Не найден список c версиями Python')
+        raise ParserFindUrlException('Не найден список c версиями Python')
 
     results = [('Ссылка на документацию', 'Версия', 'Статус')]
     pattern = r'Python (?P<version>\d\.\d+) \((?P<status>.*)\)'
@@ -119,6 +120,8 @@ def pep(session):
         for dt_tag in dt_tags:
             if 'Status' in dt_tag.text:
                 status = find_siblings(dt_tag).text
+                # Эти три значения необходимы для формирования
+                # итогового результата в консоли и csv файле
                 key_status_urls.append((key, status, pep_url))
                 if key not in EXPECTED_STATUS.keys():
                     non_matching_statuses.append(
