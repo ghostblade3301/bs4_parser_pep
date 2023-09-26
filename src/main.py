@@ -120,9 +120,7 @@ def pep(session):
         for dt_tag in dt_tags:
             if 'Status' in dt_tag.text:
                 status = find_siblings(dt_tag).text
-                # Эти три значения необходимы для формирования
-                # итогового результата в консоли и csv файле
-                key_status_urls.append((key, status, pep_url))
+                key_status_urls.append(status)
                 if key not in EXPECTED_STATUS.keys():
                     non_matching_statuses.append(
                         f'Неизвестный ключ: {key}\n'
@@ -137,7 +135,7 @@ def pep(session):
                         f'Ожидаемые статусы: {EXPECTED_STATUS[key]}'
                     )
                 break
-    statuses = [key_status_url[1] for key_status_url in key_status_urls]
+    statuses = [key_status_url for key_status_url in key_status_urls]
     status_counts = {status: statuses.count(status) for status in statuses}
     peps_per_status = list(status_counts.items())
     peps_per_status.sort(key=lambda status: status[0])
