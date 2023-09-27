@@ -135,8 +135,9 @@ def pep(session):
                         f'Ожидаемые статусы: {EXPECTED_STATUS[key]}'
                     )
                 break
-    statuses = [key_status_url for key_status_url in key_status_urls]
-    status_counts = {status: statuses.count(status) for status in statuses}
+
+    status_counts = ({status: key_status_urls.count(status)
+                      for status in key_status_urls})
     peps_per_status = list(status_counts.items())
     peps_per_status.sort(key=lambda status: status[0])
     total = sum(status_counts.values())
